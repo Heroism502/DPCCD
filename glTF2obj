@@ -1,0 +1,29 @@
+import sys
+import bpy
+import os
+ 
+ # intoPath 源文件路径
+ # outPath 转换后输出的路径
+
+intoPath = "F:/model_convert"
+outPath = "F:/model_convert/save"
+
+# 遍历intoPath文件夹内的文件
+for i,j,k in os.walk(intoPath):
+    for a in k:
+      # 判断是否为.gltf格式
+        if a.endswith(".gltf"):            
+            bpy.ops.object.select_all(action = 'SELECT')
+            # 清理场景
+            bpy.ops.object.delete()
+             # 拼接文件路径  a:文件名称
+            inPathName = intoPath + "/" + a
+            # 导入gltf文件 .gltf() 使用 .gltf 函数方法导入
+            bpy.ops.import_scene.gltf(filepath = inPathName)
+            for i in range(250):
+                bpy.context.scene.frame_set(i)  
+                fname,ext = os.path.splitext(a)
+                # 拼接导出文件路径及文件名称 后缀为.obj
+                outPathName = outPath + "/" + fname + "_" + str(i) +".obj"
+                # 导出obj文件 .obj() 使用 .obj 函数方法导出
+                bpy.ops.export_scene.obj(filepath = outPathName)
