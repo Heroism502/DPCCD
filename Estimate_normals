@@ -1,0 +1,100 @@
+# coding=utf-8
+#读取点云文件，判断是否有颜色和法向量，没有法向量的估计法向量，保存为ply，把法向量和颜色都保存，之前没颜色的给个默认颜色，颜色按整数保存
+
+from pathlib import Path
+import numpy as np
+import os.path
+import open3d
+from glob import glob
+
+def saveO3dPly(filepath, o3d_pcd, normals = None, colors = 255):
+    '''
+    Save list of points (possibly with attributes such as color) into a .PLY formated file
+    Arguments: 
+        - o3d_pcd: list of points and their normals
+        - normals: 是否包含法向量
+        - colors: 是否包含颜色 0不包含 1：颜色空间为0-1 255：颜色空间为0-255
+    '''
+    num_points = len(o3d_pcd.points)
+    print("num_points:",num_points)
+    with open(filepath, "w") as the_file:
+        header_lines = ["ply", "format ascii 1.0"]
+        header_lines.append("element vertex " + str(num_points))
+        header_lines.append("property float x")
+        header_lines.append("property float y")
+        header_lines.append("property float z")
+
+        # if point have normals 
+        if normals == True:
+            header_lines.append("property float nx")
+            header_lines.append("property float ny")
+            header_lines.append("property float nz")
+        if colors != 0:
+            header_lines.append("property uchar red")
+            header_lines.append("property uchar green")
+            header_lines.append("property uchar blue")
+        
+        header_lines.append("end_header")
+        
+        for i in range(0, len(header_lines)):
+            the_file.write(header_lines[i] + "\n")
+
+        for i in range(0, num_points):
+            points = np.float32(o3d_pcd.points[i])
+            if normals == True:
+                normal = np.float32(o3d_pcd.normals[i])
+                points = np.concatenate((points, normal), axis=0)
+            if colors != 0:
+                color = np.float32(o3d_pcd.colors[i])
+                if colors == 1:
+                    color = color * 255
+                points = np.concatenate((points, color), axis=0)
+            the_file.write(tupleToStr(points) + "\n")
+
+def tupleToStr(tuple):
+    '''
+    Converts a tuple of N size into a string, where each element is separated by a space.
+    Arguments:
+    - tuple: tuple to be converted into string
+    Returns:
+        - string with the tuple values
+    '''
+    tuple_string = ""
+    for i in range(0, len(tuple)):
+        if i>5:#i<3 or 
+            string = str(int(tuple[i]))
+        else:
+            string = str(tuple[i])
+        if i == (len(tuple)-1):
+            tuple_string += string
+        else:
+            tuple_string += string + " "
+
+    return tuple_string
+
+if __name__ == '__main__':
+    source_dir = '/userhome/dataset/PCL-PCD-Dataset/PartB-Scene/pointclouds/validation/'
+    paths = glob(os.path.join(source_dir, '**', f'*.ply'), recursive=True)
+    for plyname in paths:
+        if '.ply' not in plyname:
+            continue
+        o3d_pcd = open3d.io.read_point_cloud(plyname) #会自动将颜色转为0-1
+        if len(o3d_pcd.normals) == 0: #没有法向量
+            if len(o3d_pcd.points) > 1e5: #大于10万个点
+                knn = 30
+            else:
+                knn = 20
+            o3d_pcd.estimate_normals(search_param=open3d.geometry.KDTreeSearchParamKNN(knn)) # 计算normal
+            print("estimate_normals")
+        colors = 1
+        if len(o3d_pcd.colors) == 0: #没有颜色
+            o3d_pcd.paint_uniform_color([0, 0.5, 0.5])
+        else:
+            if np.array(o3d_pcd.colors).max() > 1:
+                print("colors 255")
+                colors = 255
+        print("o3d_pcd.colors[0]:",o3d_pcd.colors[0])
+        print("o3d_pcd.normals[0]:",o3d_pcd.normals[0])
+        filename = plyname.replace('.ply',"_n.ply")
+        saveO3dPly(filename, o3d_pcd, normals = True, colors = colors)
+        print('finish writing to '+filename)
